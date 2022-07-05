@@ -1,0 +1,163 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "This template creates a VPC and 2 subnets",
+    "Metadata": {
+
+    },
+    "Parameters": {
+      "Vpconecidr": {
+          "Description": "Create cidrblock for mon to fri vpc",
+          "Type": "String",
+          "Default": "10.0.0.0/16"
+      },
+      "pubsubcidr": {
+          "Description": "This cidr is for public subnet",
+          "Type": "String",
+          "Default": "10.0.1.0/24"
+      },
+      "prtsubcidr": {
+          "Description": "This cidr is for private subnet",
+          "Type": "String",
+          "Default": "10.0.2.0/24"
+      },
+      "Keypair": {
+          "Description": "a keypair for EC2",
+          "Type": "String",
+          "Default": "sheyec2key"
+      },
+      "ImageID": {
+          "Description": "This is our AMI in NOVA",
+          "Type": "String",
+          "Default": "ami-ami-0fa49cc9dc8d62c84"
+      },
+      "InstanceType": {
+          "Description": "Instance Type selected",
+          "Type": "String",
+          "Default": "t2.micro"
+      }
+
+    },
+    "Mappings": {
+
+    },
+    "Conditions": {
+
+    },
+    "Resources": {
+"mwvpc": {
+  "Type": "AWS::EC2::VPC",
+  "Properties": {
+    "CidrBlock": { "Ref": "Vpconecidr" },
+    "Tags": [{ "Key": "Name", "Value":  "m-w-vpc1" }]
+  }
+},
+"mwpubsubnet": {
+  "Type": "AWS::EC2::Subnet",
+  "Properties": {
+    "AvailabilityZone": "us-east-2a",
+    "VpcId": { "Ref": "mwvpc" },
+    "CidrBlock": { "Ref": "pubsubcidr" },
+    "Tags": [{ "Key": "Name", "Value":  "m-w-subnet1" }]
+  }
+  },
+"mwprvtsubnet": {
+  "Type": "AWS::EC2::Subnet",
+  "Properties": {
+    "AvailabilityZone": "us-east-2b",
+    "VpcId": { "Ref": "mwvpc" },
+    "CidrBlock": { "Ref": "prtsubcidr" },
+    "Tags": [{ "Key": "Name", "Value":  "m-w-subnet2" }]
+}
+},
+"wfigw": {
+  "Type": "AWS::EC2::InternetGateway",
+  "Properties": {
+    "Tags": [{ "Key": "Name", "Value":  "wfigw" }]
+  }
+},
+"AttachGateway": {
+  "Type": "AWS::EC2::VPCGatewayAttachment",
+  "Properties": {
+    "VpcId": { "Ref": "mwvpc" },
+    "InternetGatewayId": { "Ref": "wfigw" }
+  }
+},
+"wfrt": {
+  "Type": "AWS::EC2::RouteTable",
+  "Properties": {
+    "VpcId": { "Ref": "mwvpc" },
+    "Tags": [{ "Key": "Name", "Value":  "wfrt" }]
+  }
+},
+"mwroute": {
+  "Type": "AWS::EC2::Route",
+  "Properties": {
+    "RouteTableId": { "Ref": "wfrt" },
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "GatewayId": { "Ref": "wfigw" }
+  }
+},
+"wfrtasspub": {
+  "Type": "AWS::EC2::SubnetRouteTableAssociation",
+  "Properties": {
+    "SubnetId": { "Ref": "mwpubsubnet" },
+    "RouteTableId": { "Ref": "wfrt" }
+  }
+},
+"wfNAT" : {
+   "Type" : "AWS::EC2::NatGateway",
+   "Properties" : {
+      "AllocationId" : { "Fn::GetAtt" : ["EIP", "AllocationId"]},
+      "SubnetId" : { "Ref" : "mwpubsubnet"},
+      "Tags" : [ {"Key" : "Name", "Value" : "wfnat" } ]
+     }
+},
+"EIP" : {
+   "Type" : "AWS::EC2::EIP",
+   "Properties" : {
+      "Domain" : { "Ref": "mwvpc" }
+   }
+},
+"wfwebserverSG" : {
+    "Type" : "AWS::EC2::SecurityGroup",
+    "Properties" : {
+        "GroupDescription" : "Allow http to client host",
+        "VpcId" : {"Ref" : "mwvpc"},
+        "SecurityGroupIngress" : [{
+            "IpProtocol" : "tcp",
+            "FromPort" : 80,
+            "ToPort" : 80,
+            "CidrIp" : "0.0.0.0/0"
+        }],
+        "SecurityGroupEgress" : [{
+            "IpProtocol" : "tcp",
+            "FromPort" : 80,
+            "ToPort" : 80,
+            "CidrIp" : "0.0.0.0/0"
+        }]
+    }
+},
+
+"wfwebserver": {
+    "Type": "AWS::EC2::Instance",
+    "Properties": {
+        "KeyName": { "Ref": "Keypair" },
+        "ImageId": { "Ref": "ImageID" },
+        "SubnetId": {"Ref": "mwpubsubnet" },
+        "InstanceType": { "Ref": "InstanceType" },
+        "Monitoring": "false",
+        "SecurityGroupIds" : [{ "Ref": "wfwebserverSG" }],
+        "Tags": [
+            {
+                "Key": "Name",
+                "Value": "wfec2"
+            }
+        ]
+}
+        }
+
+    },
+    "Outputs": {
+
+    }
+}

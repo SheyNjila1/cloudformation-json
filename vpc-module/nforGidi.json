@@ -1,0 +1,252 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "This is a personal 3 tier architecture project",
+    "Metadata": {
+    },
+    "Parameters": {
+      "Demovpccidrblock": {
+          "Description": "select the desired cidr for your vpc",
+          "Type": "String",
+          "Default": "10.4.0.0/16"
+      },
+      "Demopubsubcidr": {
+          "Description": " Select the desired cidr for your public subnet",
+          "Type": "String",
+          "Default": "10.4.0.0/24"
+      },
+      "Demoprvsubcidr": {
+          "Description": "Select the desired subnet for your private subnet",
+          "Type": "String",
+          "Default": "10.4.1.0/24"
+      },
+      "Demodbsubcidr": {
+          "Description": "Select the desired cidr for the data tier subnet",
+          "Type": "String",
+          "Default": "10.4.2.0/24"
+      },
+      "Demokeypair": {
+          "Description": "Select the right keypair for the Instances",
+          "Type": "String",
+          "Default": "demokey",
+          "AllowedValues": ["sheyohiokey", "sheyec2key", "demokey"]
+      },
+      "DemomimgageId": {
+          "Description": "Select the desired imageid",
+          "Type": "String",
+          "Default": "ami-0fa49cc9dc8d62c84",
+          "AllowedValues": [ "ami-09d56f8956ab235b3", "ami-0193dcf9aa4f5654e", "ami-0022f774911c1d690", "ami-0fa49cc9dc8d62c84" ]
+      },
+      "DemoInstancetype": {
+          "Description": "choose any instance type to suite your project",
+          "Type": "String",
+          "Default": "t2.micro",
+          "AllowedValues": [ "t2.micro", "m1.small", "m1.large", "t2.nano"]
+      },
+      "DemoAZs": {
+          "Description": "Select the AZ of your choosing",
+          "Type": "String",
+          "Default": "us-east-2a",
+          "AllowedValues": ["us-east-2a", "us-east-2b", "us-east-2c"]
+      },
+    },
+    "Mappings": {
+    },
+    "Conditions": {
+    },
+    "Resources": {
+      "Demovpc": {
+        "Type": "AWS::EC2::VPC",
+        "Properties": {
+          "CidrBlock": { "Ref": "Demovpccidrblock" },
+          "Tags": [{ "Key": "Name", "Value":  "Demo-vpc" }]
+        }
+      },
+      "Demopubsub": {
+        "Type": "AWS::EC2::Subnet",
+        "Properties": {
+          "AvailabilityZone": { "Ref": "DemoAZs" },
+          "VpcId": { "Ref": "Demovpc" },
+          "CidrBlock": { "Ref": "Demopubsubcidr" },
+          "Tags": [{ "Key": "Name", "Value":  "Demo-pubsub" }]
+        }
+      },
+      "Demoprvsub": {
+        "Type": "AWS::EC2::Subnet",
+        "Properties": {
+          "AvailabilityZone": { "Ref": "DemoAZs" },
+          "VpcId": { "Ref": "Demovpc" },
+          "CidrBlock": { "Ref": "Demoprvsubcidr" },
+          "Tags": [{ "Key": "Name", "Value":  "Demo-prvsub" }]
+        }
+      },
+      "Demodbsub": {
+        "Type": "AWS::EC2::Subnet",
+        "Properties": {
+          "AvailabilityZone": { "Ref": "DemoAZs" },
+          "VpcId": { "Ref": "Demovpc" },
+          "CidrBlock": { "Ref": "Demodbsubcidr" },
+          "Tags": [{ "Key": "Name", "Value":  "Demo-dbsub" }]
+        }
+      },
+      "demoigw": {
+        "Type": "AWS::EC2::InternetGateway",
+        "Properties": {
+          "Tags": [{ "Key": "name", "Value":  "demoigw" }]
+        }
+      },
+      "AttachGateway": {
+        "Type": "AWS::EC2::VPCGatewayAttachment",
+        "Properties": {
+          "VpcId": { "Ref": "Demovpc" },
+          "InternetGatewayId": { "Ref": "demoigw" }
+        }
+      },
+      "Demoroutetable": {
+        "Type": "AWS::EC2::RouteTable",
+        "Properties": {
+          "VpcId": { "Ref": "Demovpc" },
+          "Tags": [{ "Key": "Name", "Value":  "Demoroutetable" }]
+        }
+      },
+      "Demoroute": {
+        "Type": "AWS::EC2::Route",
+        "Properties": {
+          "RouteTableId": { "Ref": "Demoroutetable" },
+          "DestinationCidrBlock": "0.0.0.0/0",
+          "GatewayId": { "Ref": "demoigw" }
+        }
+      },
+      "DemoRttbassoc": {
+        "Type": "AWS::EC2::SubnetRouteTableAssociation",
+        "Properties": {
+          "SubnetId": { "Ref": "Demopubsub" },
+          "RouteTableId": { "Ref": "Demoroutetable" }
+        }
+      },
+      "Demonat" : {
+        "Type" : "AWS::EC2::NatGateway",
+        "Properties" : {
+          "AllocationId" : { "Fn::GetAtt" : ["Demoeip", "AllocationId"]},
+        "SubnetId" : { "Ref" : "Demopubsub"},
+        "Tags" : [ {"Key" : "Name", "Value" : "demo-nat" } ]
+        }
+      },
+      "Demoeip": {
+        "Type": "AWS::EC2::EIP",
+        "Properties": {
+          "Domain": { "Ref": "Demovpc" },
+          #"InstanceId": { "Ref": "Demowebserver" }
+        }
+      },
+      "demopubSG" : {
+        "Type" : "AWS::EC2::SecurityGroup",
+        "Properties" : {
+          "GroupDescription" : "This is the security group attached to the pubsubinstances",
+          "SecurityGroupIngress" : [{
+            "IpProtocol" : "tcp",
+            "FromPort" : 443,
+            "ToPort" : 443,
+            "CidrIp" : "0.0.0.0/0"
+          },
+          {
+            "IpProtocol" : "tcp",
+            "FromPort" : 22,
+            "ToPort" : 22,
+            "CidrIp" : "0.0.0.0/0" }
+          ],
+          "SecurityGroupEgress" : [{
+            "IpProtocol" : "tcp",
+            "FromPort" : 443,
+            "ToPort" : 443,
+            "CidrIp" : "0.0.0.0/0"
+            },
+            {
+            "IpProtocol" : "tcp",
+            "FromPort" : 22,
+            "ToPort" : 22,
+            "CidrIp" : "0.0.0.0/0"
+          },
+          ],
+          "VpcId" : { "Ref": "Demovpc" },
+          "Tags" :  [ { "Key": "Name", "Value":  "demopubSG" } ]
+        }
+      },
+      "DemoprvSG" : {
+        "Type" : "AWS::EC2::SecurityGroup",
+        "Properties" : {
+          "GroupDescription" : "this is a private SG for the App tier instances",
+          "SecurityGroupIngress" : [{
+            "IpProtocol" : "tcp",
+            "FromPort" : 80,
+            "ToPort" : 80,
+            "CidrIp": "0.0.0.0/0",
+          }],
+          "SecurityGroupEgress" : [{
+            "IpProtocol" : "tcp",
+            "FromPort" : 80,
+            "ToPort" : 80,
+            "CidrIp": "0.0.0.0/0",
+            }
+          ],
+          "VpcId" : { "Ref": "Demovpc" },
+          "Tags" :  [{ "Key": "Name", "Value":  "demoprvSG" } ]
+        }
+      },
+      "Demowebserver": {
+          "Type": "AWS::EC2::Instance",
+          "Properties": {
+              "KeyName": { "Ref": "Demokeypair" },
+              "DisableApiTermination": "true",
+              "SubnetId": { "Ref": "Demopubsub" },
+              "ImageId": { "Ref": "DemomimgageId" },
+              "InstanceType": { "Ref": "DemoInstancetype" },
+              "Monitoring": "false",
+              "SecurityGroupIds" : [{ "Ref": "demopubSG" }],
+              "Tags": [
+                  {
+                      "Key": "Name",
+                      "Value": "demo-webserver"
+                  }
+              ],
+            }
+    },
+    "Demoappserver": {
+        "Type": "AWS::EC2::Instance",
+        "Properties": {
+            "KeyName": { "Ref": "Demokeypair" },
+            "DisableApiTermination": "true",
+            "SubnetId": { "Ref": "Demoprvsub" },
+            "ImageId": { "Ref": "DemomimgageId" },
+            "InstanceType": { "Ref": "DemoInstancetype" },
+            "Monitoring": "false",
+            "SecurityGroupIds" : [{ "Ref": "DemoprvSG" }],
+            "Tags": [
+                {
+                    "Key": "Name",
+                    "Value": "Demo-App-server"
+                }
+            ],
+    }
+  },
+  "Demodbserver": {
+      "Type": "AWS::EC2::Instance",
+      "Properties": {
+          "KeyName": { "Ref": "Demokeypair" },
+          "DisableApiTermination": "false",
+          "SubnetId": { "Ref": "Demodbsub" },
+          "ImageId": { "Ref": "DemomimgageId" },
+          "InstanceType": { "Ref": "DemoInstancetype" },
+          "Monitoring": "false",
+          "SecurityGroupIds" : [{ "Ref": "DemoprvSG" }],
+          "Tags": [
+              {
+                  "Key": "Name",
+                  "Value": "Demo-dbserver"
+              }
+          ],
+  }
+          }
+    },
+    "Outputs": {
+    },
+}

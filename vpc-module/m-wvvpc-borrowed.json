@@ -1,0 +1,354 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "VPC + WServer Template",
+    "Metadata": {
+        "LICENSE": "Apache License Version 2.0"
+    },
+    "Parameters": {
+        "VPCCidr": {
+            "Description": "Create Cidr Block for VPC",
+            "Type": "String",
+            "Default": "10.0.0.0/16"
+        },
+        "PubSN1Cidr": {
+            "Description": "Public SN Cidr-",
+            "Type": "String",
+            "Default": "10.0.0.0/24"
+        },
+        "PubSN2Cidr": {
+            "Description": "Public SN Cidr-",
+            "Type": "String",
+            "Default": "10.0.1.0/24"
+        },
+        "PrvSN1Cidr": {
+            "Description": "Public SN Cidr-",
+            "Type": "String",
+            "Default": "10.0.2.0/24"
+        },
+        "PrvSN2Cidr": {
+            "Description": "Public SN Cidr-",
+            "Type": "String",
+            "Default": "10.0.3.0/24"
+        }
+    },
+    "Mappings": {},
+    "Resources": {
+        "MyVPC": {
+            "Type": "AWS::EC2::VPC",
+            "Properties": {
+                "CidrBlock": {
+                    "Ref": "VPCCidr"
+                },
+                "EnableDnsSupport": true,
+                "EnableDnsHostnames": true,
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "A4GVPC"
+                    }
+                ]
+            }
+        },
+        "MyIGW": {
+            "Type": "AWS::EC2::InternetGateway",
+            "Properties": {
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "A4GIGW"
+                    }
+                ]
+            }
+        },
+        "EIPA": {
+            "Type": "AWS::EC2::EIP",
+            "Properties": {
+                "Domain": "vpc"
+            }
+        },
+        "EIPB": {
+            "Type": "AWS::EC2::EIP",
+            "Properties": {
+                "Domain": "vpc"
+            }
+        },
+        "IGWAttachment": {
+            "Type": "AWS::EC2::VPCGatewayAttachment",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "MyVPC"
+                },
+                "InternetGatewayId": {
+                    "Ref": "MyIGW"
+                }
+            }
+        },
+        "NatGatewayA": {
+            "Type": "AWS::EC2::NatGateway",
+            "Properties": {
+                "AllocationId": {
+                    "Fn::GetAtt": [
+                        "EIPA",
+                        "AllocationId"
+                    ]
+                },
+                "SubnetId": {
+                    "Ref": "PubSN1"
+                }
+            }
+        },
+        "NatGatewayB": {
+            "Type": "AWS::EC2::NatGateway",
+            "Properties": {
+                "AllocationId": {
+                    "Fn::GetAtt": [
+                        "EIPB",
+                        "AllocationId"
+                    ]
+                },
+                "SubnetId": {
+                    "Ref": "PubSN2"
+                }
+            }
+        },
+        "RTPub": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "MyVPC"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "A4G-vpc-rt-pub"
+                    }
+                ]
+            }
+        },
+        "RTPrvA": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "MyVPC"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "A4G-vpc-rt-privA"
+                    }
+                ]
+            }
+        },
+        "RTPrvB": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "MyVPC"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "A4G-vpc-rt-privB"
+                    }
+                ]
+            }
+        },
+        "PubRoute": {
+            "Type": "AWS::EC2::Route",
+            "DependsOn": "IGWAttachment",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "RTPub"
+                },
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "GatewayId": {
+                    "Ref": "MyIGW"
+                }
+            }
+        },
+        "PrvRouteA": {
+            "Type": "AWS::EC2::Route",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "RTPrvA"
+                },
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "NatGatewayId": {
+                    "Ref": "NatGatewayA"
+                }
+            }
+        },
+        "PrvRouteB": {
+            "Type": "AWS::EC2::Route",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "RTPrvB"
+                },
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "NatGatewayId": {
+                    "Ref": "NatGatewayB"
+                }
+            }
+        },
+        "RTAssociationPubA": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "PubSN1"
+                },
+                "RouteTableId": {
+                    "Ref": "RTPub"
+                }
+            }
+        },
+        "RTAssociationPubB": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "PubSN2"
+                },
+                "RouteTableId": {
+                    "Ref": "RTPub"
+                }
+            }
+        },
+        "RTAssociationPrivA": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "PrvSN1"
+                },
+                "RouteTableId": {
+                    "Ref": "RTPrvA"
+                }
+            }
+        },
+        "RTAssociationPrivB": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "PrvSN2"
+                },
+                "RouteTableId": {
+                    "Ref": "RTPrvB"
+                }
+            }
+        },
+        "PubSN1": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "MyVPC"
+                },
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        0,
+                        {
+                            "Fn::GetAZs": ""
+                        }
+                    ]
+                },
+                "CidrBlock": {
+                    "Ref": "PubSN1Cidr"
+                },
+                "MapPublicIpOnLaunch": true,
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "Pub-SN-A"
+                    }
+                ]
+            }
+        },
+        "PubSN2": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "MyVPC"
+                },
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        1,
+                        {
+                            "Fn::GetAZs": ""
+                        }
+                    ]
+                },
+                "CidrBlock": {
+                    "Ref": "PubSN2Cidr"
+                },
+                "MapPublicIpOnLaunch": true,
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "Pub-SN-B"
+                    }
+                ]
+            }
+        },
+        "PrvSN1": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "MyVPC"
+                },
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        0,
+                        {
+                            "Fn::GetAZs": ""
+                        }
+                    ]
+                },
+                "CidrBlock": {
+                    "Ref": "PrvSN1Cidr"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "Prv-SN-A"
+                    }
+                ]
+            }
+        },
+        "PrvSN2": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "MyVPC"
+                },
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        1,
+                        {
+                            "Fn::GetAZs": ""
+                        }
+                    ]
+                },
+                "CidrBlock": {
+                    "Ref": "PrvSN2Cidr"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "Prv-SN-B"
+                    }
+                ]
+            }
+        }
+    },
+    "Outputs": {
+        "VPCID": {
+            "Description": "The ID of the VPC",
+            "Value": {
+                "Fn::GetAtt": [
+                    "MyVPC",
+                    "VpcId"
+                ]
+            },
+            "Export": {
+                "Name": "MyVPCID"
+            }
+        }
+    }
+}

@@ -1,0 +1,96 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "",
+    "Metadata": {
+
+    },
+    "Parameters": {
+
+      "vpccidr": {
+          "Description": "Enter the CidrBlock for the VPC",
+          "Type": "String",
+          "Default": "10.0.0.0/16"
+      },
+
+      "PublicSubnetcidr": {
+          "Description": "Enter the CidrBlock for the Public Subnet",
+          "Type": "String",
+          "Default": "10.0.0.0/24"
+      },
+      "PrivateSubnetcidr": {
+          "Description": "Enter the CidrBlock for the Private Subnet",
+          "Type": "String",
+          "Default": "10.0.1.0/24"
+      },
+
+    },
+    "Mappings": {
+
+    },
+    "Conditions": {
+
+    },
+
+    "Resources": {
+
+      "Sheyvpc": {
+        "Type": "AWS::EC2::VPC",
+        "Properties": {
+          "CidrBlock": { "Ref": "vpccidr" },
+          "Tags": [{ "Key": "Name", "Value":  "Shey vpc project" }]
+        }
+      },
+
+      "SheyPublicSubnet": {
+        "Type": "AWS::EC2::Subnet",
+        "Properties": {
+          "AvailabilityZone": "us-east-2a",
+          "VpcId": { "Ref": "Sheyvpc" },
+          "CidrBlock": { "Ref": "PublicSubnetcidr" },
+          "Tags": [{ "Key": "Name", "Value":  "Shey Public Subnet" }]
+        }
+      },
+
+      "SheyPrivateSubnet": {
+        "Type": "AWS::EC2::Subnet",
+        "Properties": {
+          "AvailabilityZone": "us-east-2a",
+          "VpcId": { "Ref": "Sheyvpc" },
+          "CidrBlock": { "Ref": "PrivateSubnetcidr" },
+          "Tags": [{ "Key": "Name", "Value":  "Shey Private Subnet" }]
+        }
+      },
+      "SheyIGW": {
+        "Type": "AWS::EC2::InternetGateway",
+        "Properties": {
+          "Tags": [{ "Key": "Name", "Value":  "Shey internet-gateway" }]
+        }
+      },
+      "AttachGateway": {
+        "Type": "AWS::EC2::VPCGatewayAttachment",
+        "Properties": {
+          "VpcId": { "Ref": "Sheyvpc" },
+          "InternetGatewayId": { "Ref": "SheyIGW" }
+        }
+      },
+
+      "SheyRouteTable": {
+        "Type": "AWS::EC2::RouteTable",
+        "Properties": {
+          "VpcId": { "Ref": "Sheyvpc" },
+          "Tags": [{ "Key": "Name", "Value":  "Shey Route Table Public" }]
+        }
+      },
+      "SheyRoute": {
+        "Type": "AWS::EC2::Route",
+        "Properties": {
+          "RouteTableId": "{Ref": "SheyRouteTable" },
+          "DestinationCidrBlock": ""0.0.0.0/0",
+          "GatewayId": "{ "Ref": "SheyIGW" }"
+        }
+      },
+      
+    }
+
+
+  }

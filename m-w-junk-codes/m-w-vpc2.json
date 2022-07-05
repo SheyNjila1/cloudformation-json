@@ -1,0 +1,166 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+        "Description": "This template creates a vpc and two subnets",
+        "Metadata": {
+        },
+        "Parameters": {
+          "vpccidrblock": {
+              "Description": "create cidr block for m-w vpc",
+              "Type": "String",
+              "Default": "12.0.0.0/16"
+          },
+          "publicsubnetcidr": {
+              "Description": "This is a cidr block for the public subnet",
+              "Type": "String",
+              "Default": "12.0.1.0/24"
+          },
+          "privatesubnet": {
+              "Description": "This is the CIDR is for private subnet",
+              "Type": "String",
+              "Default": "12.0.2.0/24"
+          },
+          "keypair": {
+              "Description": "These are the keypairs to use",
+              "Type": "String",
+              "Default": "linux"
+          },
+          "AMIID": {
+              "Description": "This is the Image ID",
+              "Type": "String",
+              "Default": "ami-0022f774911c1d690"
+          },
+          "mwinstancetype": {
+              "Description": "Instance Type to use",
+              "Type": "String",
+              "Default": "t2.micro"
+          }
+        },
+        "Mappings": {
+        },
+        "Conditions": {
+        },
+        "Resources": {
+            "mwvpc": {
+              "Type": "AWS::EC2::VPC",
+              "Properties": {
+                "CidrBlock": { "Ref": "vpccidrblock" },
+                "Tags": [{ "Key": "name", "Value":  "m-w-vpc" }]
+              }
+            },
+            "mwpubsubnet": {
+              "Type": "AWS::EC2::Subnet",
+              "Properties": {
+                "AvailabilityZone": "us-east-1a",
+                "VpcId": { "Ref": "mwvpc" },
+                "CidrBlock": { "Ref": "publicsubnetcidr" },
+                "Tags": [{ "Key": "name", "Value":  "m-w-private-subnet1" }]
+              }
+            },
+            "mwprivatesubnet": {
+                "Type": "AWS::EC2::Subnet",
+                "Properties": {
+                  "AvailabilityZone": "us-east-1a",
+                  "VpcId": { "Ref": "mwvpc" },
+                  "CidrBlock": { "Ref": "privatesubnet" },
+                  "Tags": [{ "Key": "name", "Value":  "m-w-private-subnet2" }]
+                }
+            },
+            "mwigw": {
+              "Type": "AWS::EC2::InternetGateway",
+              "Properties": {
+                "Tags":[{ "Key": "Name", "Value":  "w-f-igw" }]
+              }
+            },
+            "AttachGateway": {
+              "Type": "AWS::EC2::VPCGatewayAttachment",
+              "Properties": {
+                "VpcId": { "Ref": "mwvpc" },
+                "InternetGatewayId": { "Ref": "mwigw" }
+              }
+            },
+            "mwrouteTable": {
+              "Type": "AWS::EC2::RouteTable",
+              "Properties": {
+                "VpcId":
+                { "Ref": "mwvpc" },
+                "Tags":[
+                { "Key": "Name", "Value":  "mw-rt" }]
+              }
+            },
+            "mwroute": {
+              "Type": "AWS::EC2::Route",
+              "Properties": {
+                "RouteTableId": { "Ref": "mwrouteTable" },
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "GatewayId": { "Ref": "mwigw" }
+              }
+            },
+            "mwrtassociationpub": {
+              "Type": "AWS::EC2::SubnetRouteTableAssociation",
+              "Properties": {
+                "SubnetId": { "Ref": "mwpubsubnet" },
+                "RouteTableId": { "Ref": "mwrouteTable" }
+              }
+            },
+            "mwnat" : {
+              "Type" : "AWS::EC2::NatGateway",
+              "Properties" : {
+                 "AllocationId" : { "Fn::GetAtt" : ["EIP", "AllocationId"]},
+                 "SubnetId" : { "Ref" : "mwpubsubnet"},
+                 "Tags" : [ {"Key" : "Name", "Value" : "mw-nat" } ]
+                }
+           },
+           "EIP" : {
+              "Type" : "AWS::EC2::EIP",
+              "Properties" : {
+                 "Domain" : { "Ref": "mwvpc" }
+              }
+           },
+           "mwelasticiproute" : {
+              "Type" : "AWS::EC2::Route",
+              "Properties" : {
+                 "RouteTableId" : { "Ref" : "mwrouteTable" },
+                 "DestinationCidrBlock" : "0.0.0.0/0",
+                 "NatGatewayId" : { "Ref" : "mwnat" }
+              }
+           },
+           "webserversg" : {
+              "Type" : "AWS::EC2::SecurityGroup",
+              "Properties" : {
+                  "GroupDescription" : "Allow http to client host",
+                  "VpcId" : {"Ref" : "mwvpc"},
+                  "SecurityGroupIngress" : [{
+                      "IpProtocol" : "tcp",
+                      "FromPort" : 80,
+                      "ToPort" : 80,
+                      "CidrIp" : "0.0.0.0/0"
+                  }],
+                  "SecurityGroupEgress" : [{
+                      "IpProtocol" : "tcp",
+                      "FromPort" : 80,
+                      "ToPort" : 80,
+                      "CidrIp" : "0.0.0.0/0"
+                  }]
+              }
+            },
+           "mwserver": {
+               "Type": "AWS::EC2::Instance",
+               "Properties": {
+                   "KeyName": { "Ref": "keypair" },
+                   "ImageId": { "Ref": "AMIID" },
+                   "InstanceType": { "Ref": "mwinstancetype" },
+                   "SubnetId": { "Ref": "mwpubsubnet" },
+                   "Monitoring": "false",
+                   "SecurityGroupIds" : [{ "Ref": "webserversg" }],
+                   "Tags": [
+                       {
+                           "Key": "Name",
+                           "Value": "mw-ec2"
+                       }
+                   ]
+               }
+          }
+        },
+        "Outputs": {
+        }
+}

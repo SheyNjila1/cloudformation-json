@@ -1,0 +1,134 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "",
+    "Metadata": {
+
+    },
+    "Parameters": {
+      "EnvironmentName": {
+          "Description": "Select an environment",
+          "Type": "String",
+          "AllowedValues": [
+          "Dev",
+          "Stg"
+        ],
+        "ConstraintDescription": "Environment must match with specified AllowedValue"
+
+      },
+      "Vpconecidr": {
+          "Description": "Create cidrblock for mon to fri vpc",
+          "Type": "String",
+          "Default": "10.0.0.0/16"
+      },
+      "pubsubcidr": {
+          "Description": "This cidr is for public subnet",
+          "Type": "String",
+          "Default": "10.0.1.0/24"
+      },
+      "prtsubcidr": {
+          "Description": "This cidr is for private subnet",
+          "Type": "String",
+          "Default": "10.0.2.0/24"
+      }
+
+    },
+    "Mappings": {
+
+    },
+    "Conditions": {
+
+    },
+    "Resources": {
+      "mwvpc": {
+        "Type": "AWS::EC2::VPC",
+        "Properties": {
+          "CidrBlock": { "Ref": "Vpconecidr" },
+          "Tags": [{ "Key": "Name", "Value":  "m-w-vpc1" }]
+        }
+      },
+      "mwpubsubnet": {
+        "Type": "AWS::EC2::Subnet",
+        "Properties": {
+          "AvailabilityZone": "us-east-1a",
+          "VpcId": { "Ref": "mwvpc" },
+          "CidrBlock": { "Ref": "pubsubcidr" },
+          "Tags": [{ "Key": "Name", "Value":  "m-w-subnet1" }]
+        }
+        },
+      "mwprvtsubnet": {
+        "Type": "AWS::EC2::Subnet",
+        "Properties": {
+          "AvailabilityZone": "us-east-1b",
+          "VpcId": { "Ref": "mwvpc" },
+          "CidrBlock": { "Ref": "prtsubcidr" },
+          "Tags": [{ "Key": "Name", "Value":  "m-w-subnet2" }]
+      }
+      },
+      "wfigw": {
+        "Type": "AWS::EC2::InternetGateway",
+        "Properties": {
+          "Tags": [{ "Key": "Name", "Value":  "wfigw" }]
+        }
+      },
+      "AttachGateway": {
+        "Type": "AWS::EC2::VPCGatewayAttachment",
+        "Properties": {
+          "VpcId": { "Ref": "mwvpc" },
+          "InternetGatewayId": { "Ref": "wfigw" }
+        }
+      },
+      "wfrt": {
+        "Type": "AWS::EC2::RouteTable",
+        "Properties": {
+          "VpcId": { "Ref": "mwvpc" },
+          "Tags": [{ "Key": "Name", "Value":  "wfrt" }]
+        }
+      },
+      "mwroute": {
+        "Type": "AWS::EC2::Route",
+        "Properties": {
+          "RouteTableId": { "Ref": "wfrt" },
+          "DestinationCidrBlock": "0.0.0.0/0",
+          "GatewayId": { "Ref": "wfigw" }
+        }
+      },
+      "wfrtasspub": {
+        "Type": "AWS::EC2::SubnetRouteTableAssociation",
+        "Properties": {
+          "SubnetId": { "Ref": "mwpubsubnet" },
+          "RouteTableId": { "Ref": "wfrt" }
+        }
+      },
+      "wfNAT" : {
+         "Type" : "AWS::EC2::NatGateway",
+         "Properties" : {
+            "AllocationId" : { "Fn::GetAtt" : ["EIP", "AllocationId"]},
+            "SubnetId" : { "Ref" : "mwpubsubnet"},
+            "Tags" : [ {"Key" : "Name", "Value" : "wfnat" } ]
+           }
+      },
+      "EIP" : {
+         "Type" : "AWS::EC2::EIP",
+         "Properties" : {
+            "Domain" : { "Ref": "mwvpc" }
+         }
+      }
+
+    },
+    "Outputs" : {
+      "mwvpc" : {
+        "Description" : "The ID of the VPC",
+        "Value" : { "Ref" : "mwvpc" },
+        "Export" : {
+            "Name" : {"Fn::Sub": "mwVPC-ID" }
+    }
+  },
+  "mwpubsubnet" : {
+    "Description" : "The ID of the VPC",
+    "Value" : { "Ref" : "mwpubsubnet" },
+    "Export" : {
+        "Name" : {"Fn::Sub": "pubsubnetID" }
+}
+}
+}
+}

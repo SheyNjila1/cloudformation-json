@@ -1,0 +1,51 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: " This template creates a vpc and two subnets"
+Resources:
+  mwvpcshey:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/24
+      Tags:
+      - Key: Name
+        Value: m-w-vpcshey
+  MyPublicSubnet2a:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: us-east-2a
+      VpcId:
+        Ref: mwvpcshey
+      CidrBlock: 10.0.0.0/26
+      Tags:
+      - Key: Name
+        Value: MyPublicSubnetshey1
+  MyPublicSubnet2b:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: us-east-2b
+      VpcId:
+        Ref: mwvpcshey
+      CidrBlock: 10.0.1.0/26
+      Tags:
+      - Key: Name
+        Value: MyPublicSubnetshey2
+  MyPrivateSubnet2a:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: us-east-2a
+      VpcId:
+        Ref: mwvpcshey
+      CidrBlock: 10.0.2.0/26
+      Tags:
+      - Key: Name
+        Value: MyPrivateSubnetshey1
+  MyPrivateSubnet2b:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: us-east-2b
+      VpcId:
+        Ref: mwvpcshey
+      CidrBlock: 10.0.3.0/26
+      Tags:
+      - Key: Name
+        Value: MyPrivateSubnetshey2
+Outputs: {}

@@ -1,0 +1,176 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "This template creates a vpc and two subnets",
+    "Metadata": {
+​
+    },
+    "Parameters": {
+      "vpccidr": {
+        "Description": "This is the vpc cidr",
+        "Type": "String",
+        "Default": "10.0.0.0/16",
+      },
+      "pubsubnetcidr": {
+        "Description": "This is the public subnet CidrBlock",
+        "Type": "String",
+        "Default": "10.0.0.0/24",
+      },
+      "prvsubnetcidr": {
+        "Description": "This is the private subnet CidrBlock",
+        "Type": "String",
+        "Default": "10.0.1.0/24",
+      },
+      "keyname": {
+        "Description": "This list the keypair within the region",
+        "Type": "AWS::EC2::KeyPair::KeyName",
+      },
+      "amiid": {
+        "Description": "The AMI ID ",
+        "Type": "String",
+        "Default": "ami-0022f774911c1d690",
+      },
+      "InstanceTypepara": {
+        "Description": "The ec2 instance type",
+        "Type": "String",
+        "Default": "t2.micro"
+      }
+    },
+    "Mappings": {
+​
+    },
+    "Conditions": {
+​
+    },
+    "Resources": {
+      "oshvpc": {
+        "Type": "AWS::EC2::VPC",
+        "Properties": {
+          "CidrBlock": { "Ref": "vpccidr" },
+          "Tags": [{ "Key": "Env", "Value":  "prod", "Key": "Name", "Value": "osh" }]
+        }
+      },
+      "pubsubnet": {
+        "Type": "AWS::EC2::Subnet",
+        "Properties": {
+          "AvailabilityZone": "us-east-1a",
+          "VpcId": { "Ref": "oshvpc" },
+          "CidrBlock": { "Ref": "pubsubnetcidr" },
+          "Tags": [{ "Key": "Name", "Value":  "pubsubnet" }]
+        }
+      },
+      "prvsubnet": {
+        "Type": "AWS::EC2::Subnet",
+        "Properties": {
+          "AvailabilityZone": "us-east-1b",
+          "VpcId": { "Ref": "oshvpc" },
+          "CidrBlock": { "Ref": "prvsubnetcidr" },
+          "Tags": [{ "Key": "Name", "Value":  "prvsubnet" }]
+        }
+      },
+      "oshigw": {
+        "Type": "AWS::EC2::InternetGateway",
+        "Properties": {
+          "Tags" : [ {"Key" : "Name", "Value" : "igwosh"}]
+        }
+      },
+      "IgwVpcAttach": {
+        "Type" : "AWS::EC2::VPCGatewayAttachment",
+        "Properties": {
+          "InternetGatewayId": { "Ref": "oshigw" },
+          "VpcId": { "Ref": "oshvpc" },
+        }
+      },
+      "OshRouteTable": {
+        "Type": "AWS::EC2::RouteTable",
+        "Properties": {
+          "VpcId": { "Ref": "oshvpc" },
+          "Tags": [{ "Key": "Name", "Value":  "oshrtb" }]
+        }
+      },
+      "Oshroute": {
+        "Type": "AWS::EC2::Route",
+        "Properties": {
+          "RouteTableId": { "Ref": "OshRouteTable" },
+          "DestinationCidrBlock": "0.0.0.0/0",
+          "GatewayId": { "Ref": "oshigw" },
+        }
+      },
+      "OshrouteTableAssoc": {
+        "Type": "AWS::EC2::SubnetRouteTableAssociation",
+        "Properties": {
+          "SubnetId": { "Ref": "pubsubnet" },
+          "RouteTableId": { "Ref": "OshRouteTable" },
+        }
+      },
+      "prvrouteTable": {
+        "Type": "AWS::EC2::RouteTable",
+        "Properties": {
+          "VpcId": { "Ref": "oshvpc" },
+          "Tags": [{ "Key": "Name", "Value":  "prvrtb" }]
+        }
+      },
+      "prvroute": {
+        "Type": "AWS::EC2::Route",
+        "Properties": {
+          "RouteTableId": { "Ref": "prvrouteTable" },
+          "DestinationCidrBlock": "0.0.0.0/0",
+          "NatGatewayId": { "Ref": "oshnatgw" },
+        }
+      },
+      "prvrouteTableAssoc": {
+        "Type": "AWS::EC2::SubnetRouteTableAssociation",
+        "Properties": {
+          "SubnetId": { "Ref": "prvsubnet" },
+          "RouteTableId": { "Ref": "prvrouteTable" },
+        }
+      },
+      "oshnatgw": {
+        "Type" : "AWS::EC2::NatGateway",
+        "Properties": {
+          "AllocationId" : { "Fn::GetAtt" : ["osheip", "AllocationId"]},
+          "SubnetId" : { "Ref" : "pubsubnet"},
+          "Tags" : [ {"Key" : "Name", "Value" : "Oshnatigw" } ]
+        }
+      },
+      "osheip": {
+        "DependsOn": "IgwVpcAttach",
+        "Type" : "AWS::EC2::EIP",
+        "Properties" : {
+          "Domain" : { "Ref": "oshvpc" },
+        }
+      },
+      "webapp": {
+          "Type": "AWS::EC2::Instance",
+          "Properties": {
+              "KeyName": { "Ref": "keyname" },
+              "DisableApiTermination": "false",
+              "ImageId": { "Ref": "amiid" },
+              "InstanceType": { "Ref": "InstanceTypepara" },
+              "Monitoring": "false",
+              "InstanceInitiatedShutdownBehavior": "terminate",
+              "SubnetId": { "Ref": "prvsubnet" },
+              "SecurityGroupIds": [{ "Ref": "oshInstanceSG" }],
+              "Tags": [{ "Key": "Name", "Value":  "webinstance" }]
+            }
+          },
+      "oshInstanceSG" : {
+        "Type" : "AWS::EC2::SecurityGroup",
+        "Properties" : {
+          "GroupDescription" : "Allow http to client host",
+          "VpcId" : {"Ref" : "oshvpc"},
+          "SecurityGroupIngress" : [{
+            "IpProtocol" : "tcp",
+            "FromPort" : 80,
+            "ToPort" : 80,
+            "CidrIp" : "0.0.0.0/0"
+            }],
+          "SecurityGroupEgress" : [{
+            "IpProtocol" : "-1",
+            "FromPort" : 0,
+            "ToPort" : 0,
+            "CidrIp" : "0.0.0.0/0"
+            }],
+        }
+      },
+  }
+}

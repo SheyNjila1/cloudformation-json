@@ -1,0 +1,163 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "This template creates a vpc and two subnets",
+    "Metadata": {
+
+    },
+    "Parameters": {
+      "vpccidr": {
+          "Description": "create cidr block for mon to wed vpc",
+          "Type": "String",
+          "Default": "10.0.0.0/16"
+      },
+      "pubsubnetcidr": {
+          "Description": "this is the cidr block for the public subnet",
+          "Type": "String",
+          "Default": "10.0.1.0/24"
+      },
+      "prisubnetcidr": {
+          "Description": "this is the cidr block for the private subnet",
+          "Type": "String",
+          "Default": "10.0.2.0/24"
+      },
+      "keyname": {
+          "Description": "keypair for webserver",
+          "Type": "String",
+          "Default": "sheyec2key"
+      },
+      "ImageId": {
+          "Description": "image id for webserver",
+          "Type": "String",
+          "Default": "ami-0fa49cc9dc8d62c84"
+      },
+      "InstanceType": {
+          "Description": "instance type for webserver",
+          "Type": "String",
+          "Default": "t2.micro"
+      }
+
+    },
+    "Mappings": {
+
+    },
+    "Conditions": {
+
+    },
+    "Resources": {
+      "mwvpc": {
+        "Type": "AWS::EC2::VPC",
+        "Properties": {
+          "CidrBlock": { "Ref": "vpccidr" },
+          "Tags": [{ "Key": "Name", "Value":  "mwvpc" }]
+        }
+      },
+      "mwpublicsubnet": {
+        "Type": "AWS::EC2::Subnet",
+        "Properties": {
+          "AvailabilityZone": "us-east-2a",
+          "VpcId": { "Ref": "mwvpc" },
+          "CidrBlock": { "Ref": "pubsubnetcidr" },
+          "Tags": [{ "Key": "Name", "Value":  "mwpublicsubnet" }]
+        }
+      },
+      "mwprivatesubnet": {
+        "Type": "AWS::EC2::Subnet",
+        "Properties": {
+          "AvailabilityZone": "us-east-2a",
+          "VpcId": { "Ref": "mwvpc" },
+          "CidrBlock": { "Ref": "prisubnetcidr" },
+          "Tags": [{ "Key": "Name", "Value":  "mwprivatesubnet" }]
+        }
+      },
+      "mwigw": {
+        "Type": "AWS::EC2::InternetGateway",
+        "Properties": {
+          "Tags": [{ "Key": "Name", "Value":  "mwigw" }]
+        }
+      },
+      "AttachGateway": {
+        "Type": "AWS::EC2::VPCGatewayAttachment",
+        "Properties": {
+          "VpcId": { "Ref": "mwvpc" },
+          "InternetGatewayId": { "Ref": "mwigw" }
+        }
+      },
+      "mwrouteTable": {
+        "Type": "AWS::EC2::RouteTable",
+        "Properties": {
+          "VpcId": { "Ref": "mwvpc" },
+          "Tags": [{ "Key": "Name", "Value":  "mwrouteTable" }]
+        }
+      },
+      "mwroute": {
+        "Type": "AWS::EC2::Route",
+        "Properties": {
+          "RouteTableId": { "Ref": "mwrouteTable" },
+          "DestinationCidrBlock": "0.0.0.0/0",
+          "GatewayId": { "Ref": "mwigw" }
+        }
+      },
+      "mwpublicrouteTableAssoc": {
+        "Type": "AWS::EC2::SubnetRouteTableAssociation",
+        "Properties": {
+          "SubnetId": { "Ref": "mwpublicsubnet" },
+          "RouteTableId": { "Ref": "mwrouteTable" }
+        }
+      },
+      "mwNAT" : {
+         "Type" : "AWS::EC2::NatGateway",
+         "Properties" : {
+            "AllocationId" : { "Fn::GetAtt" : ["EIP", "AllocationId"]},
+            "SubnetId" : { "Ref" : "mwpublicsubnet"},
+            "Tags" : [ {"Key" : "Name", "Value" : "mwNAT" } ]
+           }
+      },
+      "EIP" : {
+         "Type" : "AWS::EC2::EIP",
+         "Properties" : {
+            "Domain" : { "Ref": "mwvpc" }
+         }
+      },
+      "mwSecurityGroup" : {
+          "Type" : "AWS::EC2::SecurityGroup",
+          "Properties" : {
+              "GroupDescription" : "Allow http to webserver",
+              "VpcId" : {"Ref" : "mwvpc"},
+              "SecurityGroupIngress" : [{
+                  "IpProtocol" : "tcp",
+                  "FromPort" : 80,
+                  "ToPort" : 80,
+                  "CidrIp" : "0.0.0.0/0"
+              }],
+              "SecurityGroupEgress" : [{
+                  "IpProtocol" : "tcp",
+                  "FromPort" : 80,
+                  "ToPort" : 80,
+                  "CidrIp" : "0.0.0.0/0"
+        }]
+        }
+    },
+
+      "mwwebserver": {
+          "Type": "AWS::EC2::Instance",
+          "Properties": {
+              "KeyName": { "Ref": "keyname" },
+              "ImageId": { "Ref": "ImageId" },
+              "SubnetId": { "Ref": "mwprivatesubnet" },
+              "InstanceType": { "Ref": "InstanceType" },
+              "Monitoring": "false",
+              "SecurityGroupIds" : [{ "Ref": "mwSecurityGroup" }],
+              "Tags": [
+                  {
+                      "Key": "Name",
+                      "Value": "mwwebserver"
+                  }
+              ],
+      }
+
+    },
+  },
+    "Outputs": {
+
+    }
+}

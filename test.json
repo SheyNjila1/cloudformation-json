@@ -1,0 +1,43 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "S3 bucket creation demo in json",
+    "Metadata": {
+    },
+    "Parameters": {
+    },
+    "Mappings": {
+    },
+    "Conditions": {
+    },
+    "Resources": {
+      "demobucket": {
+        "Type": "AWS::S3::Bucket",
+        "Properties": {
+          "AccessControl": "PublicReadWrite",
+          "BucketName": "9-5406-05-22",
+          "LifecycleConfiguration": {
+            "Rules": [
+                        {
+                            "Id": "GlacierRule",
+                            "Prefix": "glacier",
+                            "Status": "Enabled",
+                            "ExpirationInDays": 365,
+                            "Transitions": [
+                                {
+                                    "TransitionInDays": 1,
+                                    "StorageClass": "GLACIER"
+                                }
+                            ]
+                        }
+                    ]
+          },
+          "VersioningConfiguration": {
+            "Status": "Enabled"
+          },
+          "Tags": [{ "Key": "Name", "Value":  "demobucket8-0406-05-22" }]
+        }
+      }
+    },
+    "Outputs": {
+    }
+}

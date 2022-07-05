@@ -1,0 +1,172 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "This template creates a VPC and 2 subnets",
+    "Metadata": {
+
+    },
+    "Parameters": {
+      "Vpccidr": {
+          "Description": "create cidrblock for mon to wed vpc",
+          "Type": "String",
+          "Default": "10.0.0.0/16"
+      },
+      "pubsbncidr": {
+          "Description": "this is the cidr for the public subnet",
+          "Type": "String",
+          "Default": "10.0.1.0/24"
+      },
+      "prvsbncidr": {
+          "Description": "this is the cidr for the private subnet",
+          "Type": "String",
+          "Default": "10.0.2.0/24"
+      },
+      "keypair": {
+          "Description": "the keypair for the instance",
+          "Type": "String",
+          "Default": "new"
+      },
+      "imageid": {
+          "Description": "my image id for us-east-1",
+          "Type": "String",
+          "Default": "ami-0022f774911c1d690"
+      },
+      "instancetype": {
+          "Description": "type of instance",
+          "Type": "String",
+          "Default": "t2.micro"
+      }
+
+    },
+    "Mappings": {
+
+    },
+    "Conditions": {
+
+    },
+    "Resources": {
+      "mwvpc": {
+        "Type": "AWS::EC2::VPC",
+        "Properties": {
+          "CidrBlock": { "Ref": "Vpccidr" },
+          "Tags": [{ "Key": "Name", "Value":  "m-w-vpc1" }]
+        }
+      },
+      "mwpubsubnet": {
+  "Type": "AWS::EC2::Subnet",
+  "Properties": {
+    "AvailabilityZone": "us-east-1a",
+    "VpcId": { "Ref": "mwvpc" },
+    "CidrBlock": { "Ref": "pubsbncidr" },
+    "Tags": [{ "Key": "Name", "Value":  "m-w-subnet" }]
+  }
+},
+"mwprvsubnet": {
+  "Type": "AWS::EC2::Subnet",
+  "Properties": {
+    "AvailabilityZone": "us-east-1b",
+    "VpcId": { "Ref": "mwvpc" },
+    "CidrBlock": { "Ref": "prvsbncidr" },
+    "Tags": [{ "Key": "Name", "Value":  "m-w-subnet" }]
+  }
+},
+"mwigw": {
+  "Type": "AWS::EC2::InternetGateway",
+  "Properties": {
+    "Tags": [{ "Key": "Name", "Value":  "mwigw" }]
+  }
+},
+"AttachGateway": {
+  "Type": "AWS::EC2::VPCGatewayAttachment",
+  "Properties": {
+    "VpcId": { "Ref": "mwvpc" },
+    "InternetGatewayId": { "Ref": "mwigw" }
+  }
+},
+"mwroutetable": {
+  "Type": "AWS::EC2::RouteTable",
+  "Properties": {
+    "VpcId": { "Ref": "mwvpc" },
+    "Tags": [{ "Key": "Name", "Value":  "mwroutetable" }]
+  }
+},
+"mwroute": {
+  "Type": "AWS::EC2::Route",
+  "Properties": {
+    "RouteTableId": { "Ref": "mwroutetable" },
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "GatewayId": { "Ref": "mwigw" }
+  }
+},
+"mwroutetableass": {
+  "Type": "AWS::EC2::SubnetRouteTableAssociation",
+  "Properties": {
+    "SubnetId":{ "Ref": "mwpubsubnet" },
+    "RouteTableId": { "Ref": "mwroutetable" },
+  }
+},
+"mwnat" : {
+   "Type" : "AWS::EC2::NatGateway",
+   "Properties" : {
+      "AllocationId" : { "Fn::GetAtt" : ["EIP", "AllocationId"]},
+      "SubnetId" : { "Ref" : "mwpubsubnet"},
+      "Tags" : [ {"Key" : "Name", "Value" : "mwnat" } ]
+     }
+},
+"EIP" : {
+   "DependsOn" : "VPCGatewayAttach",
+   "Type" : "AWS::EC2::EIP",
+   "Properties" : {
+      "Domain" : { "Ref": "mwvpc" }
+   }
+},
+"Route" : {
+   "Type" : "AWS::EC2::Route",
+   "Properties" : {
+      "RouteTableId" : { "Ref" : "mwroutetable" },
+      "DestinationCidrBlock" : "0.0.0.0/0",
+      "NatGatewayId" : { "Ref" : "mwnat" }
+   }
+},
+"mwwebsg" : {
+    "Type" : "AWS::EC2::SecurityGroup",
+    "Properties" : {
+        "GroupDescription" : "Allow http to client host",
+        "VpcId" : {"Ref" : "mwvpc"},
+        "SecurityGroupIngress" : [{
+            "IpProtocol" : "tcp",
+            "FromPort" : 80,
+            "ToPort" : 80,
+            "CidrIp" : "0.0.0.0/0"
+        }],
+        "SecurityGroupEgress" : [{
+            "IpProtocol" : "tcp",
+            "FromPort" : 80,
+            "ToPort" : 80,
+            "CidrIp" : "0.0.0.0/0"
+        }]
+    }
+},
+
+"mwwebserver1": {
+    "Type": "AWS::EC2::Instance",
+    "Properties": {
+        "KeyName": { "Ref": "keypair" },
+        "DisableApiTermination": "true",
+        "ImageId": { "Ref": "imageid" },
+        "InstanceType": { "Ref": "instancetype" },
+        "Monitoring": "false",
+        "SecurityGroupIds" : { "Ref": "mwwebsg" },
+        "Tags": [
+            {
+                "Key": "Name",
+                "Value": "mwwebserver1"
+            }
+        ],
+
+}
+        }
+    },
+    "Outputs": {
+
+    }
+}

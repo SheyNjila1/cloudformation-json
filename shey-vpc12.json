@@ -1,0 +1,201 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "",
+  "Metadata": {},
+  "Parameters": {
+    "vpccidr": {
+      "Description": "Enter the CidrBlock for the VPC",
+      "Type": "String",
+      "Default": "10.0.0.0/16"
+    },
+    "PublicSubnetcidr": {
+      "Description": "Enter the CidrBlock for the Public Subnet",
+      "Type": "String",
+      "Default": "10.0.0.0/24"
+    },
+    "PrivateSubnetcidr": {
+      "Description": "Enter the CidrBlock for the Private Subnet",
+      "Type": "String",
+      "Default": "10.0.1.0/24"
+    },
+
+    "SheyInstanceType": {
+      "Description": "Indicate the Instance Type for the webserver",
+      "Type": "String",
+      "Default": "t2.micro"
+    },
+
+    "SheyImageID": {
+      "Description": "Indicate the AMI ID of the Instance",
+      "Type": "String",
+      "Default": "ami-0fa49cc9dc8d62c84"
+    },
+
+    "SheyKeyName": {
+      "Description": "Enter the keyname for ssh",
+      "Type": "String",
+      "Default": "sheyec2key"
+    },
+  },
+  "Mappings": {},
+  "Conditions": {},
+
+  "Resources": {
+    "Sheyvpc": {
+      "Type": "AWS::EC2::VPC",
+      "Properties": {
+        "CidrBlock": {
+          "Ref": "vpccidr"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "Shey vpc project"
+          }
+        ]
+      }
+    },
+    "SheyPublicSubnet": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "AvailabilityZone": "us-east-2a",
+        "VpcId": {
+          "Ref": "Sheyvpc"
+        },
+        "CidrBlock": {
+          "Ref": "PublicSubnetcidr"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "Shey Public Subnet"
+          }
+        ]
+      }
+    },
+    "SheyPrivateSubnet": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "AvailabilityZone": "us-east-2a",
+        "VpcId": {
+          "Ref": "Sheyvpc"
+        },
+        "CidrBlock": {
+          "Ref": "PrivateSubnetcidr"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "Shey Private Subnet"
+          }
+        ]
+      }
+    },
+    "SheyIGW": {
+      "Type": "AWS::EC2::InternetGateway",
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "Shey internet-gateway"
+          }
+        ]
+      }
+    },
+    "AttachGateway": {
+      "Type": "AWS::EC2::VPCGatewayAttachment",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Sheyvpc"
+        },
+        "InternetGatewayId": {
+          "Ref": "SheyIGW"
+        }
+      }
+    },
+    "SheyRouteTable": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {
+          "Ref": "Sheyvpc"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "Shey Route Table Public"
+          }
+        ]
+      }
+    },
+    "SheyRoute": {
+      "Type": "AWS::EC2::Route",
+      "Properties": {
+        "RouteTableId": {"Ref": "SheyRouteTable"},
+      "DestinationCidrBlock": "0.0.0.0/0",
+          "GatewayId": { "Ref": "SheyIGW" }
+        }
+    },
+    "RouteTableAssocPublic": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "SubnetId": { "Ref": "SheyPublicSubnet" },
+        "RouteTableId": { "Ref": "SheyRouteTable" }
+        }
+    },
+
+    "SheyNAT" : {
+      "Type" : "AWS::EC2::NatGateway",
+      "Properties" : {
+        "AllocationId" : { "Fn::GetAtt" : ["SheyEIP", "AllocationId"]},
+        "SubnetId" : { "Ref" : "SheyPublicSubnet"},
+        "Tags" : [ {"Key" : "Name", "Value" : "SheyNAT" } ]
+     }
+    },
+    "SheyEIP" : {
+      "Type" : "AWS::EC2::EIP",
+      "Properties" : {
+        "Domain" : { "Ref": "Sheyvpc" }
+      }
+    },
+    "SheySecurityGroup" : {
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+      "GroupDescription" : "Allow http to client host",
+      "VpcId" : {"Ref" : "Sheyvpc"},
+      "SecurityGroupIngress" : [{
+          "IpProtocol" : "tcp",
+          "FromPort" : 80,
+          "ToPort" : 80,
+          "CidrIp" : "0.0.0.0/0"
+      }],
+      "SecurityGroupEgress" : [{
+          "IpProtocol" : "tcp",
+          "FromPort" : 80,
+          "ToPort" : 80,
+          "CidrIp" : "0.0.0.0/0"
+      }]
+    }
+    },
+    "SheyWebserver": {
+      "Type": "AWS::EC2::Instance",
+      "Properties": {
+          "KeyName": { "Ref": "SheyKeyName" },
+          "ImageId": { "Ref": "SheyImageID" },
+          "SubnetId": { "Ref": "SheyPublicSubnet" },
+          "InstanceType": { "Ref": "SheyInstanceType" },
+          "Monitoring": "false",
+          "SecurityGroupIds" : [{ "Ref": "SheySecurityGroup" }],
+          "Tags": [
+              {
+                  "Key": "Name",
+                  "Value": "Shey Server Instance"
+                }
+            ],
+    }
+
+    },
+    },
+  "Outputs": {
+
+    },
+}
